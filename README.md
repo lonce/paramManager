@@ -43,7 +43,8 @@ Nothing special
 
 ## Authors
 
-* **Lonce Wyse**  [lonce.org](http://lonce.org)
+* Lonce Wyse  [lonce.org](http://lonce.org)
+* Muhammad Huzaifah
 
 
 
