@@ -19,7 +19,7 @@ class pdict(dict) :
      'param_name' : {'times' : [], 
                      'values' : [],
                      'units' : (categorical, frequency, amplitude, power, pitch, ...), default: None
-                     'nvals' : number of potential values, defualt: 0 (means continuous real)
+                     'nvals' : number of potential values, default: 0 (means continuous real)
                      'minval: default: 0
                      'maxval: default: 1},
      ...
@@ -155,7 +155,12 @@ class paramManager() :
         with open(path + '.params') as fh:
             params = json.load(fh, object_hook=as_pdict)
         return params
-  
+
+    def getParamNames(self, pfname) :
+        '''Return the param names i.e. dictionary keys in data file in a list'''
+        paramdict = self.getParams(pfname)
+        return [*paramdict]
+
     def getFullPathNames(self, dir) :
         '''Returns a list of the full path names for all the data files in datapath.
         You will need the datapath/filename.ext in order to process files with other libraries.'''
