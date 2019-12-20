@@ -161,6 +161,13 @@ class paramManager() :
         paramdict = self.getParams(pfname)
         return [*paramdict]
 
+    def getParamSize(self, pfname, prop) :
+        '''Return the length of values/times for a specific param prop in file pfname'''
+        paramdict = self.getParams(pfname)
+        lentimes = len(paramdict[prop]['times'])
+        lenvalues = len(paramdict[prop]['values'])
+        return lentimes, lenvalues
+
     def getFullPathNames(self, dir) :
         '''Returns a list of the full path names for all the data files in datapath.
         You will need the datapath/filename.ext in order to process files with other libraries.'''
@@ -195,7 +202,7 @@ class paramManager() :
                 file.write(json.dumps(params, cls=NumpyEncoder, indent=4)) # use `json.loads` to do the reverse
 				
 				
-    def resampleParam(self,params,prop,sr,timestart=None,timeend=None,verbose=False,overwrite=False):
+    def resampleParam(self,params,prop,sr,timestart=None,timeend=None,verbose=False,overwrite=False,return_verbose=False):
         '''resample the chosen parameter by linear interpolation (scipy's interp1d). 
 		Modifies the 'times' and 'values' entries but leaves others unchanged.
 		Can resample the parameter for a chunk of audio by specifying timestart and timeend. Note: does not chunk the actual audio file. 
@@ -214,10 +221,14 @@ class paramManager() :
             timestart = min(params[prop]['times'])
         if timeend is None:
             timeend = max(params[prop]['times'])
-        if verbose:			
+        if verbose:
+            A = np.array(params[prop]['times'])
+            B = np.array(params[prop]['values'])
+            subtimes = A[(A>=timestart)&(A<=timeend)]
+            subvalues = B[(A>=timestart)&(A<=timeend)]		
             print("--Data resampled from--")
-            print("times:",params[prop]['times'])
-            print("values:",params[prop]['values'])
+            print("times:",subtimes)
+            print("values:",subvalues)
         
         new_x = np.linspace(timestart, timeend, sr)
         try:
@@ -241,8 +252,12 @@ class paramManager() :
 
             with open(self.parampath + '/' + shortname + '.params' , 'w') as file:
                 file.write(json.dumps(params, cls=NumpyEncoder, indent=4))
-				
-        return new_x,new_y
+
+        if return_verbose:
+            assert verbose is True, 'set verbose option if want to return original times and values!'
+            return new_x,new_y,subtimes,subvalues
+        else:
+            return new_x,new_y
 
     def resampleAllParams(self,params,sr,timestart=None,timeend=None,prop=None,verbose=False,overwrite=False):
         '''resample multiple parameters in parameter file using resampleParam method.
