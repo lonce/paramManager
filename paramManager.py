@@ -200,8 +200,25 @@ class paramManager() :
         #save the modified structure to file
         with open(path + '.params' , 'w') as file:
                 file.write(json.dumps(params, cls=NumpyEncoder, indent=4)) # use `json.loads` to do the reverse
-				
-				
+
+	
+    @staticmethod			
+    def resample(paramvect,original_sr,resampling_sr,axis=1):
+        '''resample the chosen parameter by linear interpolation (scipy's interp1d). 
+        paramvect - vector of parameter values of shape (batch,length,features)
+        ''' 
+        x = np.linspace(0,paramvect.shape[axis]/original_sr, paramvect.shape[axis])
+        new_x = np.linspace(0,paramvect.shape[axis]/original_sr, resampling_sr*paramvect.shape[axis]//original_sr)
+        #x = np.arange(0,paramvect.shape[axis]/original_sr, 1/original_sr)
+        #new_x = np.arange(0,paramvect.shape[axis]/original_sr, 1/resampling_sr)
+        try:
+            new_y = interp1d(x,paramvect,fill_value="extrapolate",axis=axis)(new_x)
+        except ValueError:
+            print("Could not interpolate!",x,new_x)
+
+        return new_x,new_y
+
+
     def resampleParam(self,params,prop,sr,timestart=None,timeend=None,verbose=False,overwrite=False,return_verbose=False):
         '''resample the chosen parameter by linear interpolation (scipy's interp1d). 
 		Modifies the 'times' and 'values' entries but leaves others unchanged.
@@ -258,6 +275,7 @@ class paramManager() :
             return new_x,new_y,subtimes,subvalues
         else:
             return new_x,new_y
+
 
     def resampleAllParams(self,params,sr,timestart=None,timeend=None,prop=None,verbose=False,overwrite=False):
         '''resample multiple parameters in parameter file using resampleParam method.
