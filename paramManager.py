@@ -95,14 +95,21 @@ class NumpyEncoder(json.JSONEncoder):
 #
 class paramManager() :
     def __init__(self, datapath, parampath) :
-        '''Manages paramter files for the datafile stored in datapath. Creates parampath if it doesnt exist.'''
+        '''Manages parameter files for the datafile stored in datapath. Creates parampath if it doesnt exist.
+        paramManager can also take a single file as the datapath, in which case parampath is the parent folder of the param file'''
         self.datapath=datapath #these are the root folders
         self.parampath=parampath #init will create the same folder structure for under parampath as in datapath
 
-        for dirpath, dirnames, filenames in os.walk(datapath):
-            structure = os.path.join(parampath, os.path.relpath(dirpath, datapath))
-            if not os.path.isdir(structure):
-                os.mkdir(structure)
+        if os.path.isdir(datapath):
+            for dirpath, dirnames, filenames in os.walk(datapath):
+                structure = os.path.join(parampath, os.path.relpath(dirpath, datapath))
+                if not os.path.isdir(structure):
+                    os.mkdir(structure)
+        else:
+            self.filepath,self.basename = os.path.split(self.datapath)
+            if len(self.filepath) == 0:
+                self.filepath = '.' 
+            self.shortname, _ = os.path.splitext(self.basename)
             
     def filenames(self, dir) :
         """return a list of filename is dir"""
@@ -115,43 +122,61 @@ class paramManager() :
             print("{} already exists and overite is False; Not initializing".format(self.parampath))
             return
 
-        for dirpath, dirnames, filenames in os.walk(self.datapath):
-            if filenames: #ignore loop if list is empty
-                for name in filenames:
-                    shortname, extension = os.path.splitext(name)
-                    structure = os.path.join(self.parampath, os.path.relpath(dirpath, self.datapath))
-                    foo=pdict(name)
-                    with open(structure + '/' + shortname + '.params' , 'w') as file:
-                        file.write(json.dumps(foo, cls=NumpyEncoder, indent=4)) # use `json.loads` to do the reverse    
+        if os.path.isdir(self.datapath):
+            for dirpath, dirnames, filenames in os.walk(self.datapath):
+                if filenames: #ignore loop if list is empty
+                    for name in filenames:
+                        shortname, extension = os.path.splitext(name)
+                        structure = os.path.join(self.parampath, os.path.relpath(dirpath, self.datapath))
+                        foo=pdict(name)
+                        with open(structure + '/' + shortname + '.params' , 'w') as file:
+                            file.write(json.dumps(foo, cls=NumpyEncoder, indent=4)) # use `json.loads` to do the reverse
+        else: #if a single file provided to paramManager instead of a directory
+            foo=pdict(self.basename)
+            with open(self.parampath + '/' + self.shortname + '.params' , 'w') as file:
+                file.write(json.dumps(foo, cls=NumpyEncoder, indent=4))
                   
     def checkIntegrity(self) :
         '''Does a simple check for a 1-to-1 match between datafiles and paramfiles'''
         integrity=True
 
         # Is there a parameter file for every file in the datapath?
-        fulldatapath,_,dataname = listDirectory_all(self.datapath)
-        fullparampath,_,paramname = listDirectory_all(self.parampath)
-        diff = list(set(dataname) - set(paramname))
-        if diff:
-            print("{} does not exist".format(diff))
-            integrity=False
+        if os.path.isdir(self.datapath):
+            fulldatapath,_,dataname = listDirectory_all(self.datapath)
+            fullparampath,_,paramname = listDirectory_all(self.parampath)
+            diff = list(set(dataname) - set(paramname))
+            if diff:
+                print("{} does not exist".format(diff))
+                integrity=False
+        else:
+            integrity = os.path.exists(self.parampath + '/' + self.shortname + '.params') 
 
         # Is there a data file for every corresponding to the meta:filename stored in each param file?
-        for paramfile in fullparampath:
-            with open(paramfile) as fh:
+        if os.path.isdir(self.datapath):
+            for paramfile in fullparampath:
+                with open(paramfile) as fh:
+                    foo=json.load(fh)
+                    structure = os.path.join(self.datapath, os.path.split(os.path.relpath(paramfile, self.parampath))[0])
+                    if not os.path.isfile(structure + "/" + foo['meta']['filename']):
+                        print("{} does not exist".format(structure + "/" + foo['meta']['filename']))
+                        integrity=False
+        else:
+            with open(self.parampath + '/' + self.shortname + '.params') as fh:
                 foo=json.load(fh)
-                structure = os.path.join(self.datapath, os.path.split(os.path.relpath(paramfile, self.parampath))[0])
-                if not os.path.isfile(structure + "/" + foo['meta']['filename']):
-                    print("{} does not exist".format(structure + "/" + foo['meta']['filename']))
-                    integrity=False
+                if not os.path.isfile(self.filepath + "/" + foo['meta']['filename']):
+                        print("{} does not exist".format(self.filepath + "/" + foo['meta']['filename']))
+                        integrity=False
         
         return integrity
 
     # get the parameter data structure from full path named file
     def getParams(self, pfname) :
         '''Get the pdict from the parameter file corresponding to the data file'''
-        structure = os.path.join(self.parampath, os.path.relpath(pfname, self.datapath))
-        path, ext = os.path.splitext(structure)
+        if os.path.isdir(self.datapath):
+            structure = os.path.join(self.parampath, os.path.relpath(pfname, self.datapath))
+            path, ext = os.path.splitext(structure)
+        else:
+            path = self.parampath + '/' + self.shortname
         with open(path + '.params') as fh:
             params = json.load(fh, object_hook=as_pdict)
         return params
