@@ -60,16 +60,28 @@ def as_pdict(dct):
     else :
         return dct
 
-def listDirectory_all(directory,topdown=True):
-    """returns a list of all files in directory and all its subdirectories"""
+def listDirectory_all(directory,fileExt='.wav',topdown=True):
+    """returns a list of all files in directory and all its subdirectories
+    directory can also take a single file.
+    fileList: full path to file
+    fnameList: basenames
+    fnameList_noext: basenames with no extension"""
     fileList = []
     fnameList = []
     fnameList_noext = []
-    for root, _, files in os.walk(directory, topdown=topdown):
-        for name in files:
-            fileList.append(os.path.join(root, name))
-            fnameList.append(name)
-            fnameList_noext.append(os.path.splitext(name)[0])
+    if os.path.isdir(directory):
+        for root, _, files in os.walk(directory, topdown=topdown):
+            for name in files:
+                if name.endswith(fileExt):
+                    fileList.append(os.path.join(root, name))
+                    fnameList.append(name)
+                    fnameList_noext.append(os.path.splitext(name)[0])
+    else:
+        if directory.endswith(fileExt):
+            fileList.append(directory)
+            basename = os.path.basename(directory)
+            fnameList.append(basename)
+            fnameList_noext.append(os.path.splitext(basename)[0])       
     return fileList, fnameList, fnameList_noext
 
 # json doesn't know how to encode numpy data, so we convert them to python lists
@@ -94,11 +106,12 @@ class NumpyEncoder(json.JSONEncoder):
 # This is the class to import to manage parameter files
 #
 class paramManager() :
-    def __init__(self, datapath, parampath) :
+    def __init__(self, datapath, parampath, fileExt='.wav') :
         '''Manages parameter files for the datafile stored in datapath. Creates parampath if it doesnt exist.
         paramManager can also take a single file as the datapath, in which case parampath is the parent folder of the param file'''
         self.datapath=datapath #these are the root folders
         self.parampath=parampath #init will create the same folder structure for under parampath as in datapath
+        self.dataext = fileExt
 
         if os.path.isdir(datapath):
             for dirpath, dirnames, filenames in os.walk(datapath):
@@ -112,12 +125,12 @@ class paramManager() :
             self.shortname, _ = os.path.splitext(self.basename)
             
     def filenames(self, dir) :
-        """return a list of filename is dir"""
+        """return a list of filename in dir"""
         return [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f))]
            
     def initParamFiles(self, overwrite=False) : 
         '''Creates one parameter file in parampath for each data file in datapath.'''
-        '''You can not addParameter()s until the parameter files exist.'''
+        '''You can not addParameter(s) until the parameter files exist.'''
         if ((os.path.exists(self.parampath)) and not overwrite) :
             print("{} already exists and overite is False; Not initializing".format(self.parampath))
             return
@@ -126,11 +139,12 @@ class paramManager() :
             for dirpath, dirnames, filenames in os.walk(self.datapath):
                 if filenames: #ignore loop if list is empty
                     for name in filenames:
-                        shortname, extension = os.path.splitext(name)
-                        structure = os.path.join(self.parampath, os.path.relpath(dirpath, self.datapath))
-                        foo=pdict(name)
-                        with open(structure + '/' + shortname + '.params' , 'w') as file:
-                            file.write(json.dumps(foo, cls=NumpyEncoder, indent=4)) # use `json.loads` to do the reverse
+                        if name.endswith(self.dataext):
+                            shortname, extension = os.path.splitext(name)
+                            structure = os.path.join(self.parampath, os.path.relpath(dirpath, self.datapath))
+                            foo=pdict(name)
+                            with open(structure + '/' + shortname + '.params' , 'w') as file:
+                                file.write(json.dumps(foo, cls=NumpyEncoder, indent=4)) # use `json.loads` to do the reverse
         else: #if a single file provided to paramManager instead of a directory
             foo=pdict(self.basename)
             with open(self.parampath + '/' + self.shortname + '.params' , 'w') as file:
@@ -142,8 +156,8 @@ class paramManager() :
 
         # Is there a parameter file for every file in the datapath?
         if os.path.isdir(self.datapath):
-            fulldatapath,_,dataname = listDirectory_all(self.datapath)
-            fullparampath,_,paramname = listDirectory_all(self.parampath)
+            fulldatapath,_,dataname = listDirectory_all(self.datapath,fileExt=self.dataext)
+            fullparampath,_,paramname = listDirectory_all(self.parampath,fileExt='.params')
             diff = list(set(dataname) - set(paramname))
             if diff:
                 print("{} does not exist".format(diff))
@@ -175,6 +189,7 @@ class paramManager() :
         if os.path.isdir(self.datapath):
             structure = os.path.join(self.parampath, os.path.relpath(pfname, self.datapath))
             path, ext = os.path.splitext(structure)
+            print(path)
         else:
             path = self.parampath + '/' + self.shortname
         with open(path + '.params') as fh:
@@ -196,7 +211,7 @@ class paramManager() :
     def getFullPathNames(self, dir) :
         '''Returns a list of the full path names for all the data files in datapath.
         You will need the datapath/filename.ext in order to process files with other libraries.'''
-        flist,_,_ = listDirectory_all(dir) 
+        flist,_,_ = listDirectory_all(dir,fileExt=self.dataext) 
         return flist
                     
     # add a parameter to the data sturcture and write the parameter file
@@ -211,9 +226,11 @@ class paramManager() :
         'minval: default: 0
         'maxval: default: 1
          '''
-
-        structure = os.path.join(self.parampath, os.path.relpath(pfname, self.datapath))
-        path, ext = os.path.splitext(structure)
+        if os.path.isdir(self.datapath):
+            structure = os.path.join(self.parampath, os.path.relpath(pfname, self.datapath))
+            path, ext = os.path.splitext(structure)
+        else:
+            path = self.parampath + '/' + self.shortname
         
         params = self.getParams(pfname)
         #enforce 2 values for each parameter
