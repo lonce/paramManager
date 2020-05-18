@@ -248,6 +248,8 @@ class paramManager() :
     def resample(paramvect,original_sr,resampling_sr,axis=1):
         '''resample the chosen parameter by linear interpolation (scipy's interp1d). 
         paramvect - vector of parameter values of shape (batch,length,features)
+        original_sr: original sampling rate of paramvect
+        resampling_sr: the sampling rate paramvect will be resampled to
         ''' 
         x = np.linspace(0,paramvect.shape[axis]/original_sr, paramvect.shape[axis])
         new_x = np.linspace(0,paramvect.shape[axis]/original_sr, resampling_sr*paramvect.shape[axis]//original_sr)
@@ -261,7 +263,7 @@ class paramManager() :
         return new_x,new_y
 
 
-    def resampleParam(self,params,prop,sr,timestart=None,timeend=None,verbose=False,overwrite=False,return_verbose=False):
+    def resampleParam(self,params,prop,nsamples,timestart=None,timeend=None,verbose=False,overwrite=False,return_verbose=False):
         '''resample the chosen parameter by linear interpolation (scipy's interp1d). 
 		Modifies the 'times' and 'values' entries but leaves others unchanged.
 		Can resample the parameter for a chunk of audio by specifying timestart and timeend. Note: does not chunk the actual audio file. 
@@ -269,7 +271,7 @@ class paramManager() :
         
 		params - (loaded) json parameter file (output of getParams)
         prop - name of the parameter
-        sr - new sampling rate i.e. len of new 'times' and 'values' list 
+        nsamples - number of samples between timestart and timeend i.e. len of new 'times' and 'values' list 
         timestart - start time corresponding to the audio timestamp in seconds
 		timeend - end time corresponding to the audio timestamp in seconds
 		verbose - prints out parameter before and after
@@ -289,7 +291,7 @@ class paramManager() :
             print("times:",subtimes)
             print("values:",subvalues)
         
-        new_x = np.linspace(timestart, timeend, sr)
+        new_x = np.linspace(timestart, timeend, nsamples)
         try:
             new_y = interp1d(params[prop]['times'],params[prop]['values'],fill_value="extrapolate")(new_x)
         except ValueError:
@@ -319,7 +321,7 @@ class paramManager() :
             return new_x,new_y
 
 
-    def resampleAllParams(self,params,sr,timestart=None,timeend=None,prop=None,verbose=False,overwrite=False):
+    def resampleAllParams(self,params,nsamples,timestart=None,timeend=None,prop=None,verbose=False,overwrite=False):
         '''resample multiple parameters in parameter file using resampleParam method.
         prop contains the list of selected parameters. If None specified will default to all parameters (except meta).
         Will always ignore meta parameter.'''
@@ -330,10 +332,10 @@ class paramManager() :
             if entry != 'meta' and entry in params:
                 if verbose:
                     print(entry)
-                    _,value = self.resampleParam(params,entry,sr,timestart,timeend,verbose,overwrite)
+                    _,value = self.resampleParam(params,entry,nsamples,timestart,timeend,verbose,overwrite)
                     print(' ')
                 else:
-                    _,value = self.resampleParam(params,entry,sr,timestart,timeend,verbose,overwrite)
+                    _,value = self.resampleParam(params,entry,nsamples,timestart,timeend,verbose,overwrite)
                 paramdict[str(entry)] = value
         return paramdict
 
