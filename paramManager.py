@@ -189,7 +189,6 @@ class paramManager() :
         if os.path.isdir(self.datapath):
             structure = os.path.join(self.parampath, os.path.relpath(pfname, self.datapath))
             path, ext = os.path.splitext(structure)
-            print(path)
         else:
             path = self.parampath + '/' + self.shortname
         with open(path + '.params') as fh:
